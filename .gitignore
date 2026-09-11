@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.sqlite
+*.mp4
+video/node_modules/
+video/out/
+video/public/thumb_hist.png

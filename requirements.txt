@@ -1,0 +1,4 @@
+jupedsim
+shapely
+numpy
+matplotlib
