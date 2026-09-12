@@ -27,14 +27,58 @@ Result of the run in this repository:
 | standard deviation | 3.36 m |
 | random-walk prediction | √10 · 1 m = 3.16 m |
 
+## How the coin flip is modelled in JuPedSim
+
+The interesting part is not the board, it is how a per-row random decision is
+expressed with JuPedSim's journey system. JuPedSim has no probabilistic
+transition, so the randomness lives in Python and JuPedSim does the walking.
+
+1. **One waypoint stage per gap.** Every gap of every peg row that is
+   reachable from the slit gets a waypoint stage at the gap centre with a
+   0.5 m radius: 2 gaps in the first row, 3 in the second, up to 11 in the
+   last, plus a start waypoint above the first row.
+
+2. **Coin flips at spawn time.** When an agent is created, numpy draws 10
+   values from {−1, +1} with equal probability. The cumulative sum of the
+   first r+1 flips is the gap offset after row r, so the tuple is the agent's
+   complete path.
+
+3. **The path becomes a journey.** For that tuple the code builds a
+   `JourneyDescription` whose stages are the start waypoint, the 10 chosen
+   gap waypoints and the exit of the final column, with a fixed transition
+   from each stage to the next. Journeys are cached by tuple, so identical
+   paths share one journey.
+
+4. **One exit per column.** JuPedSim steers towards the centroid of an exit
+   polygon. A single wide exit pulled every agent back to the centre after
+   the last row, so each column has its own 0.9 m exit bin.
+
+5. **JuPedSim does the rest.** Routing takes the agent from waypoint to
+   waypoint around the pegs, and the collision-free speed model handles
+   queueing and interactions. The agent never decides anything during the
+   run, so the probability is exactly 1/2 per row and the exit histogram is a
+   true binomial(10, 1/2) sample. What the simulation adds is the physical
+   walk, not the randomness.
+
+Two alternatives were tried and rejected:
+
+- **Round-robin transitions** inside JuPedSim, alternating left and right at
+  each gap. That is a rotor-router: deterministic, far too regular, and the
+  spread collapsed.
+- **No waypoints, just an exit.** Shortest-path routing is deterministic, so
+  every agent walked straight down the middle.
+
+If the decision should live inside the simulation, the closest option is
+`switch_agent_journey` when an agent reaches a row, rolling the die there
+instead of at spawn.
+
 ## Why JuPedSim
 
 [JuPedSim](https://www.jupedsim.org) is an open-source pedestrian dynamics
 library. It provides the pieces this demo needs out of the box:
 
 - a walkable area with obstacles (the pegs) and automatic routing around them,
-- journeys built from waypoint stages with explicit transitions, which is how
-  the per-row left/right decision is expressed,
+- journeys built from waypoint stages with explicit transitions,
 - operational models that keep agents from overlapping, so the stream really
   does split and queue at the pegs like balls on pins,
 - a trajectory file that the [JuPedSim web app](https://app.jupedsim.org)
